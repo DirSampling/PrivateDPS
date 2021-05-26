@@ -13,6 +13,7 @@ The file `utils.py` contains many auxiliary functions for compting the privacy g
 * `alpha2rho(min_alphas, gamma, Delta_2sq)` computes `rho` from the minimum of `alpha`'s.
 * `rho2alpha(rho, gamma, Delta_2sq)` computes the minimum of `alpha`'s, given a value of `rho`.
 * `tcdp2adp(delta, alpha, Delta_2sq, Delta_inf)` converts from tCDP to approximate DP at given `alpha` and `delta`.
+
 In all of the functions above, `Delta_2sq` is the squared l2-sensitivity and `Delta_inf` is the l^{infty}-sensitivity of the sample statistics.
 
 
