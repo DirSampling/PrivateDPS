@@ -7,7 +7,6 @@ from utils import alpha2rho, rho2alpha, tcdp2adp, alpha2rho_evidence, KLDir
 
 #matplotlib parameters
 plt.rcParams.update(plt.rcParamsDefault)
-#%matplotlib inline
 plt.style.use('plot_style.txt')
 alphaVal = 0.8
 linethick = 0.7
@@ -106,8 +105,7 @@ plt.savefig('Dirichlet_guarantees.pdf', format='pdf', dpi=600, bbox_inches='tigh
 
 ########## Plots of mechanisms for private normalized histograms ##########
 
-np.random.seed(1122)
-
+seed = 1122
 n_trials = 200 #number of trials at each N, rho and d
 ds = [10,1000]
 eta = 5
@@ -133,8 +131,8 @@ for k,d in enumerate(ds):                #for each d
         for i,N in enumerate(Ns):        #for each N
             
             #generate p for n_trials times
-            prob = np.random.dirichlet([eta]*d)
-            x = np.random.multinomial(N,prob,n_trials) 
+            prob = np.random.default_rng(seed).dirichlet([eta]*d)
+            x = np.random.default_rng(seed).multinomial(N,prob,n_trials) 
             p = x/N
 
             ################################################
@@ -189,8 +187,7 @@ plt.savefig('private_normalized_histograms.pdf', format='pdf', dpi=600, bbox_inc
 
 ########## Plots of mechanisms for private Multinomial-Dirichlet sampling ##########
 
-np.random.seed(2233)
-
+seed = 2233
 n_trials = 200 #number of trials at each N, rho and eta
 d = 20
 etas = [0.1,1,10]
@@ -213,8 +210,8 @@ for k,eta in enumerate(etas):               #for each eta
         for i,N in enumerate(Ns):           #for each N
             
             #generate x for n_trials times
-            prob = np.random.dirichlet([eta]*d, size = n_trials)
-            x = np.array([np.random.multinomial(N,prob[i]) for i in range(n_trials)])
+            prob = np.random.default_rng(seed).dirichlet([eta]*d, size = n_trials)
+            x = np.array([np.random.default_rng(seed).multinomial(N,prob[i]) for i in range(n_trials)])
 
             ################################################
 
