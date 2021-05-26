@@ -5,6 +5,7 @@ Repository to perform a private Dirichlet posterior sampling, and to reproduce t
 > Anonymous. Differential Privacy of Dirichlet Posterior Sampling. 2021.
 
 Run the script `plots.py` to generate all three plots in the paper. The code is implemented in Python 3.
+The scripts were tested using Numpy 1.19.5, Scipy 1.4.1 and Matplotlib 3.3.4.
 
 ## Differential Privacy
 
