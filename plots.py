@@ -1,9 +1,12 @@
 import numpy as np
+from pandas import DataFrame
 import matplotlib.pyplot as plt
 from matplotlib import pyplot
 
 from PrivDPS import DirichletPosteriorSampling, GaussianMechanism
 from utils import alpha2rho, rho2alpha, tcdp2adp, alpha2rho_evidence, KLDir
+from RiverSwim_env import *
+from PrivPSRL import *
 
 #matplotlib parameters
 plt.rcParams.update(plt.rcParamsDefault)
@@ -13,6 +16,7 @@ linethick = 0.7
 color1 = (228/255, 26/255, 28/255)
 color2 = (55/255, 126/255, 184/255)
 color3 = (77/255, 175/255, 74/255)
+colors = [color1,color2,color3]
 
 
 
@@ -179,7 +183,7 @@ for k,d in enumerate(ds):                #for each d
         ax.set_xlabel("Sample size ("+r'$N$'+")", fontsize = 5, labelpad=0)
         ax.set_ylabel('$\\ell^{\\infty}$', fontsize = 5, labelpad=0)
 
-fig.set_size_inches(4.5, 4*2/3)
+fig.set_size_inches(4.5, 2.25)
 fig.tight_layout()
 plt.savefig('private_normalized_histograms.pdf', format='pdf', dpi=600, bbox_inches='tight', transparent=True)
 
@@ -203,11 +207,11 @@ kl_gauss = np.zeros(Ns.shape[0])
 kl_dir_err = np.zeros(Ns.shape[0]) 
 kl_gauss_err = np.zeros(Ns.shape[0]) 
 
-fig, axes = plt.subplots(nrows = 3 , ncols = 3)
+fig, axes = plt.subplots(nrows = 1 , ncols = 3)
 
-for k,eta in enumerate(etas):               #for each eta
-    for l,rho in enumerate(rhos):           #for each rho 
-        for i,N in enumerate(Ns):           #for each N
+for l,rho in enumerate(rhos):           #for each rho 
+    for k,eta in enumerate(etas):       #for each eta
+        for i,N in enumerate(Ns):       #for each N
             
             #generate x for n_trials times
             prob = np.random.default_rng(seed).dirichlet([eta]*d, size = n_trials)
@@ -223,31 +227,14 @@ for k,eta in enumerate(etas):               #for each eta
             kl_dir_err[i] = 2*DirKLVec.std()
             
             ################################################
-            
-            GM = GaussianMechanism(rho, Delta_2sq)
-            q_gauss = np.clip(GM.add_noises(x, d, n_trials),0,None)
-            ai = x+1
-            bi = q_gauss+1
-            gaussKLVec = KLDir(ai,bi)
-            kl_gauss[i] = gaussKLVec.mean()
-            kl_gauss_err[i] = 2*gaussKLVec.std()
-
-            ################################################
-            
-            
-        ax = axes[k,l]
+        
+        ax = axes[l]
 
         ax.errorbar(Ns,kl_dir, yerr= kl_dir_err,
-                    color=color1,
+                    color=colors[k],
                     linestyle = '-',
                     lw=linethick,
-                    label='Dirichlet',
-                    alpha=alphaVal)
-        ax.errorbar(Ns,kl_gauss, yerr= kl_gauss_err,
-                    color=color3,
-                    linestyle = '-',
-                    lw=linethick,
-                    label='Gaussian',
+                    label=r'$\eta = '+str(eta)+ '$',
                     alpha=alphaVal)
 
         legend = ax.legend(loc='lower left', prop={'size': 4.5}, framealpha=0.7)
@@ -256,10 +243,59 @@ for k,eta in enumerate(etas):               #for each eta
         ax.set_yscale('log')
         ax.set_xlim(10, 10**5)
         ax.tick_params(axis='both', which='major', labelsize=5)
-        ax.set_title(r'$\eta = '+str(eta)+r', \rho = '+ str(rho)+ '$', fontsize = 6)
+        ax.set_title(r'$\rho = '+ str(rho)+ '$', fontsize = 6)
         ax.set_xlabel("Sample size ("+r'$N$'+")", fontsize = 5, labelpad=0)
         ax.set_ylabel('KL-divergence', fontsize = 5, labelpad=0)
 
-fig.set_size_inches(4.5, 3.5)
+fig.set_size_inches(4.5, 1.16)
 fig.tight_layout()
 plt.savefig('Multinomial-Dirichlet-sampling.pdf', format='pdf', dpi=600, bbox_inches='tight', transparent=True)
+
+###################### Plot of private PSRL with diffuse and concentrated sampling #######################
+
+N=3000
+horizon = 30
+ALPHA = 10
+OMEGA = 6
+PLOT_ALPHA = 0.02
+alphaVal = 0.8
+linethick = 0.5
+
+moving_average = lambda x, **kw: DataFrame(
+    {'x': np.asarray(x)}).x.ewm(**kw).mean().values
+
+fig, axes = plt.subplots(nrows = 2 , ncols = 2, figsize = (4.5,2.6) )
+
+for rho_plot in zip([0.01,0.1,1,10],axes.flat):
+
+    rhoVal = rho_plot[0]
+    ax = rho_plot[1]
+
+    for j,agent_name in enumerate([(PsrlAgent,'Non-private'), 
+                                   (DiffusePsrlAgent, 'Diffuse'),  
+                                   (ConcentratedPsrlAgent, 'Concentrated')]):
+
+        env = RiverSwimEnv(max_steps=horizon)
+        agent = agent_name[0](env.n_states, env.n_actions, horizon=horizon, \
+                          alpha=ALPHA, rho=rhoVal, omega=OMEGA, episodes=N)
+        rews = train_mdp_agent(agent, env, N)
+        if j==1 or j==2:
+            print("cumulative rho =", agent._sum_rho)
+
+
+        ax.plot(moving_average(np.array(rews), alpha=PLOT_ALPHA), color=colors[j],
+                        linestyle = '-',
+                        lw=linethick,
+                        label=agent_name[1],
+                        alpha=alphaVal)
+    
+    legend = ax.legend(loc='upper left', prop={'size': 4.5}, framealpha=0.7)
+    frame = legend.get_frame().set_linewidth(0.0)
+    ax.set_xlim(0, N)
+    ax.set_ylim(0, 10)
+    ax.tick_params(axis='both', which='major', labelsize=5)
+    ax.set_title(r'$\rho = '+str(rhoVal)+'$', fontsize=6)
+    ax.set_xlabel("Episode count", fontsize = 5, labelpad=0)
+    ax.set_ylabel("Reward", fontsize = 5, labelpad=0)
+fig.tight_layout()
+plt.savefig('PrivPSRL.pdf', format='pdf', dpi=600, bbox_inches='tight', transparent=True)

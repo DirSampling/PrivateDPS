@@ -4,12 +4,13 @@ Repository to perform a private Dirichlet posterior sampling, and to reproduce t
 
 > Anonymous. Differential Privacy of Dirichlet Posterior Sampling. 2021.
 
-Run the script `plots.py` to generate all three plots in the paper. The code is implemented in Python 3.  
+Run the script `plots.py` to generate Figure 1-4 in the paper. The code is implemented in Python 3.  
+
 The scripts were tested using Numpy 1.19.5, Scipy 1.4.1 and Matplotlib 3.3.4.
 
 ## Differential Privacy
 
-The file `utils.py` contains many auxiliary functions for compting the privacy guarantees stated in the paper. 
+The file `utils.py` contains many auxiliary functions for computing the privacy guarantees stated in the paper. 
 * `alpha2rho(min_alphas, gamma, Delta_2sq)` computes `rho` from the minimum of `alpha`'s.
 * `rho2alpha(rho, gamma, Delta_2sq)` computes the minimum of `alpha`'s, given a value of `rho`.
 * `tcdp2adp(delta, alpha, Delta_2sq, Delta_inf)` converts from tCDP to approximate DP at given `alpha` and `delta`.
