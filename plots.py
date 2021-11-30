@@ -3,7 +3,7 @@ from pandas import DataFrame
 import matplotlib.pyplot as plt
 from matplotlib import pyplot
 
-from PrivDPS import DirichletPosteriorSampling, GaussianMechanism
+from PrivDPS import DirichletPosteriorSampling, GaussianMechanism, LaplaceMechanism
 from utils import alpha2rho, rho2alpha, tcdp2adp, alpha2rho_evidence, KLDir
 from RiverSwim_env import *
 from PrivPSRL import *
@@ -117,16 +117,19 @@ Ns = np.logspace(1,5,10).astype(np.uint32)
 rhos = [0.01, 0.1, 1]
 Delta_inf = 1
 Delta_2sq = 2
+Delta_1 = 2
 gamma = 1 
 omega = gamma/Delta_inf+1
 
 
 
 eps_dir = np.zeros(Ns.shape[0]) 
-eps_gauss = np.zeros(Ns.shape[0]) 
+eps_gauss = np.zeros(Ns.shape[0])
+eps_laplace = np.zeros(Ns.shape[0]) 
 
 eps_dir_err = np.zeros(Ns.shape[0]) 
 eps_gauss_err = np.zeros(Ns.shape[0]) 
+eps_laplace_err = np.zeros(Ns.shape[0]) 
 
 fig, axes = plt.subplots(nrows = 2 , ncols = 3)
 
@@ -157,6 +160,15 @@ for k,d in enumerate(ds):                #for each d
 
             ################################################
 
+            LM = LaplaceMechanism(rho, Delta_1/N) #note the l2-sensitivity is Delta_1/N
+            q_laplace = LM.add_noises(p, d, n_trials)
+            laplaceVec = np.max(np.abs(p-q_laplace), axis = 1)
+            eps_laplace[i] = laplaceVec.mean()         #point estimate
+            eps_laplace_err[i] = 2*laplaceVec.std()    #error bar
+
+            ################################################
+
+
             
         ax = axes[k,l]
 
@@ -171,6 +183,13 @@ for k,d in enumerate(ds):                #for each d
                     linestyle = '-',
                     lw=linethick,
                     label='Gaussian',
+                    alpha=alphaVal)
+
+        ax.errorbar(Ns,eps_laplace, yerr = eps_laplace_err,
+                    color=color3,
+                    linestyle = '-',
+                    lw=linethick,
+                    label='Laplace',
                     alpha=alphaVal)
 
         legend = ax.legend(loc='upper right', prop={'size': 4.5}, framealpha=0.7)

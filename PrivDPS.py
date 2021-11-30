@@ -49,3 +49,21 @@ class GaussianMechanism():
         
     def get_sigma(self):
         return self.sigma
+
+
+class LaplaceMechanism():
+    
+    def __init__(self, rho, Delta_1 = 1):
+        self.rho = rho
+        self.Delta_1 = Delta_1
+        self.scale = Delta_1/np.sqrt(2*self.rho)
+        
+    def add_noises(self, x, d, n_trials, seed = None): #x must be a (n_trials x d) array
+        return x+np.random.default_rng(seed).laplace(0, self.scale, (n_trials,d))
+    
+    def set_rho(self, new_rho):
+        self.rho = new_rho
+        self.scale = Delta_1/np.sqrt(2*self.rho)
+        
+    def get_scale(self):
+        return self.scale
