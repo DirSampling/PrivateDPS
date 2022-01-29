@@ -3,11 +3,11 @@ from scipy.special import polygamma
 from scipy import optimize
 
 
-def concentrated_objective(x,rho,gamma,n):
-    return rho-2*n*polygamma(1,x-gamma)
+def concentrated_objective(x,epsilon,lambda_,n):
+    return epsilon-2*n*lambda_*polygamma(1,x-lambda_+1)
 
-def concentrated_objective_derivative(x,rho,gamma,n):
-    return [-2*n*polygamma(2,x-gamma)]
+def concentrated_objective_derivative(x,epsilon,lambda_,n):
+    return [-2*n*lambda_*polygamma(2,x-lambda_+1)]
 
 def sample_normal_gamma(mu, lmbd, alpha, beta):
     """ https://en.wikipedia.org/wiki/Normal-gamma_distribution
@@ -19,15 +19,15 @@ def sample_normal_gamma(mu, lmbd, alpha, beta):
 
 class PsrlAgent:
     def __init__(self, n_states, n_actions, alpha=10.0, 
-                 horizon=10, rho = None, omega=None, episodes=100):
+                 horizon=10, epsilon = None, lambda_=None, episodes=100):
         self._n_states = n_states
         self._n_actions = n_actions
         self._horizon = horizon
         self._episodes = episodes
         self._episode_count = 0
         self._alpha = alpha #prior parameter
-        self._rho = None #privacy parameter (rho) for posterior Dirichlet sampling
-        self._omega = None #privacy parameter (omega) for posterior Dirichlet sampling
+        self._epsilon = None #privacy parameter (epsilon) for posterior Dirichlet sampling
+        self._lambda_ = None #privacy parameter (lambda_) for posterior Dirichlet sampling
         self._r = 1 #diffuse parameter, 1 in non-private case
 
         # params for transition sampling - Dirichlet distribution
@@ -106,14 +106,14 @@ class PsrlAgent:
     
 class PsrlAgentWithNoisyRewards(PsrlAgent):
     def __init__(self, n_states, n_actions, alpha=10.0, 
-                 horizon=10, rho = None, omega=None, ng_rho = 0.5, episodes=100):
+                 horizon=10, epsilon = None, lambda_=None, ng_epsilon = 0.5, episodes=100):
         super().__init__(n_states, n_actions, alpha, 
-                 horizon, rho, omega, episodes)
+                 horizon, epsilon, lambda_, episodes)
         
-        self._ng_rho = ng_rho #privacy parameter (rho) of Gaussian mechanism
+        self._ng_epsilon = ng_epsilon #privacy parameter (epsilon) of Gaussian mechanism
         
         #Find sigma for the Gaussian mechanism
-        self._scale = np.sqrt(3*self._episodes)/np.sqrt(2*self._ng_rho)
+        self._scale = np.sqrt(3*self._episodes)/np.sqrt(2*self._ng_epsilon)
         
         
     def start_first_episode(self):
@@ -167,65 +167,64 @@ class PsrlAgentWithNoisyRewards(PsrlAgent):
     
 class DiffusePsrlAgent(PsrlAgentWithNoisyRewards):
     def __init__(self, n_states, n_actions, alpha=10.0, 
-                 horizon=10, rho=0.1, omega=6.0, ng_rho=0.5, episodes=100):
+                 horizon=10, epsilon=0.1, lambda_=6.0, ng_epsilon=0.5, episodes=100):
         super().__init__(n_states, n_actions, alpha, 
-                 horizon, rho, omega, ng_rho, episodes)
+                 horizon, epsilon, lambda_, ng_epsilon, episodes)
         
-        self._rho = rho
-        self._omega = omega    
-        self._gamma = self._omega-1
+        self._epsilon = epsilon
+        self._lambda_ = lambda_    
+        self._gamma = self._lambda_-1
         
         if self._gamma >= self._alpha:
             raise ValueError(f"gamma = {self._gamma} is greater or equal to alpha = {self._alpha}")
             
             
         #dont forget to divide by self._episodes 
-        self._r = np.sqrt(2*self._rho/(4*self._episodes*polygamma(1,self._alpha-self._gamma)))
-        self._sum_rho = 2*(self._r**2)*(polygamma(1,self._alpha-self._gamma)) #tracks the privacy budget
+        self._r = np.sqrt(2*self._epsilon/(4*self._episodes*self._lambda_*polygamma(1,self._alpha-self._lambda_+1)))
+        self._sum_epsilon = 2*(self._r**2)*(self._lambda_*polygamma(1,self._alpha-self._lambda_+1)) #tracks the privacy budget
         print("r =", self._r)
         
         
     def start_first_episode(self):
-        self._sum_rho += 2*(self._r**2)*(polygamma(1,self._alpha-self._gamma))
+        self._sum_epsilon += 2*(self._r**2)*(self._lambda_*polygamma(1,self._alpha-self._lambda_+1))
         super().start_first_episode()
         
         
     def start_episode(self):
-        self._sum_rho += 2*(self._r**2)*(polygamma(1,self._alpha-self._gamma))
+        self._sum_epsilon += 2*(self._r**2)*(self._lambda_*polygamma(1,self._alpha-self._lambda_+1))
         super().start_episode()
         
         
 class ConcentratedPsrlAgent(PsrlAgentWithNoisyRewards):
     def __init__(self, n_states, n_actions, alpha=1.0, 
-                 horizon=10, rho=0.1, omega=6.0, ng_rho=0.5, episodes=100):
+                 horizon=10, epsilon=0.1, lambda_=6.0, ng_epsilon=0.5, episodes=100):
         super().__init__(n_states, n_actions, alpha, 
-                 horizon, rho, omega, ng_rho, episodes)
+                 horizon, epsilon, lambda_, ng_epsilon, episodes)
         
-        self._rho = rho
-        self._omega = omega
-        self._gamma = self._omega-1
+        self._epsilon = epsilon
+        self._lambda_ = lambda_
         
-        if self._gamma >= self._alpha:
-            raise ValueError(f"gamma = {self._gamma} is greater or equal to alpha = {self._alpha}")        
+        if self._lambda_ >= self._alpha+1:
+            raise ValueError(f"lambda_ = {self._lambda_} is greater or equal to alpha + 1 = {self._alpha+1}")        
         
         
         sol = optimize.fsolve(concentrated_objective, \
-                            x0 = self._gamma+1, \
-                            args = (self._rho,self._gamma,self._episodes), \
+                            x0 = self._lambda_, \
+                            args = (self._epsilon,self._lambda_,self._episodes), \
                             fprime=concentrated_objective_derivative)[0]
         self._alpha = sol
         print('alpha =',self._alpha)
             
         self._dirichlet_params = np.zeros(
             (n_states, n_states, n_actions)) + self._alpha #use private prior instead
-        self._sum_rho = 2*polygamma(1,self._alpha-self._gamma) #tracks the privacy budget
+        self._sum_epsilon = 2*self._lambda_*polygamma(1,self._alpha-self._lambda_+1) #tracks the privacy budget
         
         
     def start_first_episode(self):
-        self._sum_rho += 2*polygamma(1,self._alpha-self._gamma)
+        self._sum_epsilon += 2*self._lambda_*polygamma(1,self._alpha-self._lambda_+1)
         super().start_first_episode()
         
         
     def start_episode(self):
-        self._sum_rho += 2*polygamma(1,self._alpha-self._gamma)
+        self._sum_epsilon += 2*self._lambda_*polygamma(1,self._alpha-self._lambda_+1)
         super().start_episode()

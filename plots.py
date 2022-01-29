@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib import pyplot
 
 from PrivDPS import DirichletPosteriorSampling, GaussianMechanism, LaplaceMechanism
-from utils import alpha2rho, rho2alpha, tcdp2adp, alpha2rho_evidence, KLDir
+from utils import alpha2epsilon, epsilon2alpha, alpha2adp, alpha2epsilon_evidence, KLDir
 from RiverSwim_env import *
 from PrivPSRL import *
 
@@ -24,7 +24,7 @@ fig, axes = plt.subplots(nrows = 1, ncols = 2)
 ax0 = axes[0]
 ax1 = axes[1]
 
-###################### Plot of tCDP guarantees ##########################
+###################### Plot of RDP guarantees ##########################
 
 d = 10
 n_points = 80 #number of points in the plots
@@ -33,55 +33,56 @@ n_points = 80 #number of points in the plots
 alphas = np.linspace(2,20,n_points)
 x1 = np.array([ 11 , 8 , 65 , 25 , 38 , 0])
 x2 = np.array([ 11 , 8 , 65 , 25 , 38 , 1])
-gamma = 1
+
 Delta_2sq = 1
 Delta_inf = 1
-omega = gamma/Delta_inf+1
+lambda_ = 2
+gamma = (lambda_-1)*Delta_inf
 
-true_rho = np.zeros(n_points)
+true_epsilon = np.zeros(n_points)
 
 for i,alpha in enumerate(alphas):
-    true_rho[i] = alpha2rho_evidence(x1, x2, alpha, omega)
+    true_epsilon[i] = alpha2epsilon_evidence(x1, x2, alpha, lambda_)
 
-upper_rho = alpha2rho(alphas, gamma, Delta_2sq)
+upper_epsilon = alpha2epsilon(alphas, lambda_, Delta_2sq, Delta_inf)
 
-ax0.plot(alphas,true_rho,
+ax0.plot(alphas,true_epsilon,
          lw=linethick,
-         label='True $\\rho$',
+         label='True $\\varepsilon$',
          alpha=alphaVal)
-ax0.plot(alphas,upper_rho,'--',
+ax0.plot(alphas,upper_epsilon,'--',
          linewidth=linethick,
-         label='$(\\rho,2)$-tCDP upper bound',
+         label='$(2,\\varepsilon)$-RDP upper bound',
          alpha=alphaVal)
 
 legend = ax0.legend(loc='upper right', prop={'size': 5.5}, framealpha=0.7)
 frame = legend.get_frame().set_linewidth(0.0)
 ax0.set_yscale('log') 
 ax0.set_xlim(1.5, 20)
-ax0.set_ylim(0.02, 1)
+ax0.set_ylim(0.03, 1)
 ax0.set_xticks(np.arange(2, 20, 4))
 ax0.tick_params(axis='both', which='major', labelsize=5)
 ax0.set_xlabel('$\\alpha$',fontsize=6, labelpad=0)
-ax0.set_ylabel('$\\rho$',fontsize=6, labelpad=0)
+ax0.set_ylabel('$\\epsilon$',fontsize=6, labelpad=0)
     
 
 
 ################## Plot of Approximate DP guarantees ##################
 
 
-deltas = np.logspace(-10,-0.001,n_points)
+epsilons = np.linspace(0,25,n_points)
 N=100
 Delta_inf = 1
 Delta_2sq = 1
 
 def plot_epsilon_delta(alpha, label):
-    epss = np.zeros(n_points)
+    deltas = np.zeros(n_points)
 
-    for i,delta in enumerate(deltas):
-        epss[i] = tcdp2adp(delta, alpha, Delta_2sq, Delta_inf)[1]
+    for i,epsilon in enumerate(epsilons):
+        deltas[i] = alpha2adp(epsilon, alpha, Delta_2sq, Delta_inf)[1]
 
 
-    ax1.plot(epss,deltas, 
+    ax1.plot(epsilons,deltas, 
             linestyle = '-',
             lw=linethick,
             label=label,
@@ -94,11 +95,11 @@ plot_epsilon_delta(10, '$\\alpha = 10$')
 legend = ax1.legend(loc='upper right', prop={'size': 5.5}, framealpha=0.7)
 frame = legend.get_frame().set_linewidth(0.0)
 ax1.set_yscale('log')
-ax1.set_xlim(0, 25)
+ax1.set_xlim(0, 20)
 ax1.set_ylim(10e-11, 1)
 ax1.set_xticks(np.arange(0, 24, 4))
 ax1.tick_params(axis='both', which='major', labelsize=5)
-ax1.set_xlabel("$\\epsilon$", fontsize = 6, labelpad=0)
+ax1.set_xlabel("$\\varepsilon$", fontsize = 6, labelpad=0)
 ax1.set_ylabel('$\\delta$', fontsize = 6, labelpad=0)
 
 fig.set_size_inches(3.5, 1.6)
@@ -110,16 +111,16 @@ plt.savefig('Dirichlet_guarantees.pdf', format='pdf', dpi=600, bbox_inches='tigh
 ########## Plots of mechanisms for private normalized histograms ##########
 
 seed = 1122
-n_trials = 200 #number of trials at each N, rho and d
+n_trials = 200 #number of trials at each N, epsilon and d
 ds = [10,1000]
 eta = 5
 Ns = np.logspace(1,5,10).astype(np.uint32)
-rhos = [0.01, 0.1, 1]
+epsilons = [0.01, 0.1, 1]
 Delta_inf = 1
 Delta_2sq = 2
 Delta_1 = 2
-gamma = 1 
-omega = gamma/Delta_inf+1
+lambda_ = 2
+#g = (lambda_-1)*Delta_inf
 
 
 
@@ -134,7 +135,7 @@ eps_laplace_err = np.zeros(Ns.shape[0])
 fig, axes = plt.subplots(nrows = 2 , ncols = 3)
 
 for k,d in enumerate(ds):                #for each d
-    for l,rho in enumerate(rhos):        #for each rho 
+    for l,epsilon in enumerate(epsilons):        #for each epsilon 
         for i,N in enumerate(Ns):        #for each N
             
             #generate p for n_trials times
@@ -144,31 +145,29 @@ for k,d in enumerate(ds):                #for each d
 
             ################################################
 
-            DPS = DirichletPosteriorSampling(rho, omega, Delta_2sq, Delta_inf)
+            DPS = DirichletPosteriorSampling(epsilon, lambda_, Delta_2sq, Delta_inf)
             q_dir = np.array([DPS.sample(x[row]) for row in range(n_trials)])
-            dirVec = np.max(np.abs(p-q_dir), axis = 1)
+            dirVec = np.sqrt(np.sum((p-q_dir)**2,axis=1))
             eps_dir[i] = dirVec.mean()             #point estimate
             eps_dir_err[i] = 2*dirVec.std()        #error bar
 
             ###############################################
             
-            GM = GaussianMechanism(rho, Delta_2sq/(N**2)) #note the l2-sensitivity is Delta_2/N
+            GM = GaussianMechanism(epsilon, lambda_, Delta_2sq/(N**2)) #note the l2-sensitivity is Delta_2/N
             q_gauss = GM.add_noises(p, d, n_trials)
-            gaussVec = np.max(np.abs(p-q_gauss), axis = 1)
+            gaussVec = np.sqrt(np.sum((p-q_gauss)**2,axis=1))
             eps_gauss[i] = gaussVec.mean()         #point estimate
             eps_gauss_err[i] = 2*gaussVec.std()    #error bar
 
             ################################################
 
-            LM = LaplaceMechanism(rho, Delta_1/N) #note the l2-sensitivity is Delta_1/N
+            LM = LaplaceMechanism(epsilon, lambda_, Delta_1/N) #note the l2-sensitivity is Delta_1/N
             q_laplace = LM.add_noises(p, d, n_trials)
-            laplaceVec = np.max(np.abs(p-q_laplace), axis = 1)
+            laplaceVec = np.sqrt(np.sum((p-q_laplace)**2,axis=1))
             eps_laplace[i] = laplaceVec.mean()         #point estimate
             eps_laplace_err[i] = 2*laplaceVec.std()    #error bar
 
             ################################################
-
-
             
         ax = axes[k,l]
 
@@ -184,7 +183,6 @@ for k,d in enumerate(ds):                #for each d
                     lw=linethick,
                     label='Gaussian',
                     alpha=alphaVal)
-
         ax.errorbar(Ns,eps_laplace, yerr = eps_laplace_err,
                     color=color3,
                     linestyle = '-',
@@ -198,9 +196,9 @@ for k,d in enumerate(ds):                #for each d
         ax.set_yscale('log')
         ax.set_xlim(10, 10**5)
         ax.tick_params(axis='both', which='major', labelsize=5)
-        ax.set_title(r'$d = '+str(d)+r', \rho = '+ str(rho)+ '$', fontsize = 6)
+        ax.set_title(r'$d = '+str(d)+r', \varepsilon = '+ str(epsilon)+ '$', fontsize = 6)
         ax.set_xlabel("Sample size ("+r'$N$'+")", fontsize = 5, labelpad=0)
-        ax.set_ylabel('$\\ell^{\\infty}$', fontsize = 5, labelpad=0)
+        ax.set_ylabel('$\\ell^{2}$', fontsize = 5, labelpad=0)
 
 fig.set_size_inches(4.5, 2.25)
 fig.tight_layout()
@@ -211,14 +209,14 @@ plt.savefig('private_normalized_histograms.pdf', format='pdf', dpi=600, bbox_inc
 ########## Plots of mechanisms for private Multinomial-Dirichlet sampling ##########
 
 seed = 2233
-n_trials = 200 #number of trials at each N, rho and eta
+n_trials = 200 #number of trials at each N, epsilon and eta
 d = 20
 etas = [0.1,1,10]
 Ns = np.logspace(1,5,10).astype(np.uint32)
-rhos = [0.01, 0.1, 1]
+epsilons = [0.01, 0.1, 1]
 Delta_inf = 1
 Delta_2sq = 2
-gamma = 1 #omega = gamma/Delta_inf+1
+lambda_ = 2
 
 kl_dir = np.zeros(Ns.shape[0]) 
 kl_gauss = np.zeros(Ns.shape[0]) 
@@ -228,7 +226,7 @@ kl_gauss_err = np.zeros(Ns.shape[0])
 
 fig, axes = plt.subplots(nrows = 1 , ncols = 3)
 
-for l,rho in enumerate(rhos):           #for each rho 
+for l,epsilon in enumerate(epsilons):           #for each epsilon 
     for k,eta in enumerate(etas):       #for each eta
         for i,N in enumerate(Ns):       #for each N
             
@@ -238,7 +236,7 @@ for l,rho in enumerate(rhos):           #for each rho
 
             ################################################
 
-            alpha = rho2alpha(rho, gamma, Delta_2sq)
+            alpha = epsilon2alpha(epsilon, gamma, Delta_2sq)
             ai = x+1
             bi = x+alpha
             DirKLVec = KLDir(ai,bi)
@@ -262,7 +260,7 @@ for l,rho in enumerate(rhos):           #for each rho
         ax.set_yscale('log')
         ax.set_xlim(10, 10**5)
         ax.tick_params(axis='both', which='major', labelsize=5)
-        ax.set_title(r'$\rho = '+ str(rho)+ '$', fontsize = 6)
+        ax.set_title(r'$\varepsilon = '+ str(epsilon)+ '$', fontsize = 6)
         ax.set_xlabel("Sample size ("+r'$N$'+")", fontsize = 5, labelpad=0)
         ax.set_ylabel('KL-divergence', fontsize = 5, labelpad=0)
 
@@ -275,7 +273,7 @@ plt.savefig('Multinomial-Dirichlet-sampling.pdf', format='pdf', dpi=600, bbox_in
 N=3000
 horizon = 30
 ALPHA = 10
-OMEGA = 6
+lambda_ = 2
 PLOT_ALPHA = 0.02
 alphaVal = 0.8
 linethick = 0.5
@@ -285,10 +283,10 @@ moving_average = lambda x, **kw: DataFrame(
 
 fig, axes = plt.subplots(nrows = 2 , ncols = 2, figsize = (4.5,2.6) )
 
-for rho_plot in zip([0.01,0.1,1,10],axes.flat):
+for epsilon_plot in zip([0.01,0.1,1,10],axes.flat):
 
-    rhoVal = rho_plot[0]
-    ax = rho_plot[1]
+    epsilonVal = epsilon_plot[0]
+    ax = epsilon_plot[1]
 
     for j,agent_name in enumerate([(PsrlAgent,'Non-private'), 
                                    (DiffusePsrlAgent, 'Diffuse'),  
@@ -296,10 +294,10 @@ for rho_plot in zip([0.01,0.1,1,10],axes.flat):
 
         env = RiverSwimEnv(max_steps=horizon)
         agent = agent_name[0](env.n_states, env.n_actions, horizon=horizon, \
-                          alpha=ALPHA, rho=rhoVal, omega=OMEGA, episodes=N)
+                          alpha=ALPHA, epsilon=epsilonVal, lambda_=lambda_, episodes=N)
         rews = train_mdp_agent(agent, env, N)
         if j==1 or j==2:
-            print("cumulative rho =", agent._sum_rho)
+            print("cumulative epsilon =", agent._sum_epsilon)
 
 
         ax.plot(moving_average(np.array(rews), alpha=PLOT_ALPHA), color=colors[j],
@@ -313,7 +311,7 @@ for rho_plot in zip([0.01,0.1,1,10],axes.flat):
     ax.set_xlim(0, N)
     ax.set_ylim(0, 10)
     ax.tick_params(axis='both', which='major', labelsize=5)
-    ax.set_title(r'$\rho = '+str(rhoVal)+'$', fontsize=6)
+    ax.set_title(r'$\varepsilon = '+str(epsilonVal)+'$', fontsize=6)
     ax.set_xlabel("Episode count", fontsize = 5, labelpad=0)
     ax.set_ylabel("Reward", fontsize = 5, labelpad=0)
 fig.tight_layout()
